@@ -1,0 +1,11 @@
+{
+  "name": "mezgeb-voice-bot",
+  "version": "1.0.0",
+  "main": "api/webhook.js",
+  "type": "module",
+  "dependencies": {
+    "@google/genai": "^0.1.1",
+    "groq-sdk": "^1.4.0",
+    "node-fetch": "^3.3.2"
+  }
+}
