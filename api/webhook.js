@@ -15,8 +15,16 @@ export default async function handler(req, res) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const groqApiKey = process.env.GROQ_API_KEY;
 
+  if (!groqApiKey) {
+    await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId, text: "ስህተት: GROQ_API_KEY Vercel ላይ አልተገኘም!" })
+    });
+    return res.status(200).send("OK");
+  }
+
   try {
-    // 1. ለ Groq AI ጥያቄውን መላክ
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -24,7 +32,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "llama3-80b-8192",
         messages: [
           { role: "system", content: "እርስዎ አጋዥ እና ብልህ ረዳት ነዎት። ሁልጊዜ በአማርኛ መልስ ይስጡ።" },
           { role: "user", content: userText }
@@ -33,11 +41,14 @@ export default async function handler(req, res) {
     });
 
     const groqData = await groqResponse.json();
-    const aiReply = groqData.choices?.[0]?.message?.content || "ይቅርታ፣ መልስ መስጠት አልቻልኩም።";
 
-    // 2. የ AI መልስ ለተጠቃሚው በ Telegram መላክ
-    const telegramUrl = "https://api.telegram.org/bot" + botToken + "/sendMessage";
-    await fetch(telegramUrl, {
+    if (groqData.error) {
+      throw new Error(groqData.error.message || "Groq API error");
+    }
+
+    const aiReply = groqData.choices?.[0]?.message?.content || "መልስ ማግኘት አልተቻለም።";
+
+    await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -47,7 +58,14 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Error processing AI response:", error);
+    await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: "ስህተት አጋጥሟል፦ " + error.message
+      })
+    });
   }
 
   return res.status(200).send("OK");
