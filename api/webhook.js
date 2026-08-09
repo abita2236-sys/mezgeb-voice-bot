@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatId, text: "ስህተት: GROQ_API_KEY Vercel ላይ አልተገኘም!" })
+      body: JSON.stringify({ chat_id: chatId, text: "ስህተት: GROQ_API_KEY Vercel ላይ አልተገኘም!" })
     });
     return res.status(200).send("OK");
   }
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama3-80b-8192",
+        model: "llama-3.3-70b-versatile",
         messages: [
           { role: "system", content: "እርስዎ አጋዥ እና ብልህ ረዳት ነዎት። ሁልጊዜ በአማርኛ መልስ ይስጡ።" },
           { role: "user", content: userText }
