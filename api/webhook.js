@@ -34,7 +34,10 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: "You are a helpful AI assistant. Always respond in the exact same language the user uses. If the user speaks English, respond in English. If the user speaks Amharic, respond in Amharic." },
+          { 
+            role: "system", 
+            content: "You are a highly intelligent AI assistant. Always match the user's language. When responding in Amharic, use natural, fluent, grammatically correct, and culturally accurate Amharic just like a native speaker. Avoid literal or stiff translations." 
+          },
           { role: "user", content: userText }
         ]
       })
