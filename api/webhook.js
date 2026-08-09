@@ -6,29 +6,83 @@ export default async function handler(req, res) {
   }
 
   const message = req.body?.message;
-  if (!message || !message.text) {
+  if (!message) {
     return res.status(200).send("OK");
   }
 
   const chatId = message.chat.id;
-  const userText = message.text;
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const groqApiKey = process.env.GROQ_API_KEY;
 
-  if (!groqApiKey) {
-    await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text: "ስህተት: GROQ_API_KEY Vercel ላይ አልተገኘም!" })
-    });
-    return res.status(200).send("OK");
+  if (!groqApiKey || !botToken) {
+    return res.status(200).send("API keys missing");
   }
 
+  let userText = "";
+
   try {
+    // 1. ተጠቃሚው የጽሁፍ መልእክት ከላከ
+    if (message.text) {
+      userText = message.text;
+    } 
+    // 2. ተጠቃሚው የድምፅ መልእክት (Voice Note) ከላከ
+    else if (message.voice) {
+      const fileId = message.voice.file_id;
+      
+      // የፋይሉን ትክክለኛ ማከማቻ ዱካ (Path) ከቴሌግራም እንጠይቃለን
+      const fileRes = await fetch(https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId});
+      const fileData = await fileRes.json();
+      
+      if (!fileData.ok) {
+        throw new Error("የድምፅ ፋይሉን ማግኘት አልተቻለም።");
+      }
+
+      const filePath = fileData.result.file_path;
+      const downloadUrl = https://api.telegram.org/file/bot${botToken}/${filePath};
+
+      // የድምፅ ፋይሉን እናወርዳለን
+      const audioRes = await fetch(downloadUrl);
+      const audioBuffer = await audioRes.buffer();
+
+      // FormData በመጠቀም ፋይሉን ወደ Groq Whisper API እንልካለን
+      const FormData = (await import("form-data")).default;
+      const formData = new FormData();
+      formData.append("file", audioBuffer, { filename: "voice.ogg", contentType: "audio/ogg" });
+      formData.append("model", "whisper-large-v3");
+
+      const whisperRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          "Authorization": Bearer ${groqApiKey},
+          ...formData.getHeaders()
+        },
+        body: formData
+      });
+
+      const whisperData = await whisperRes.json();
+      if (whisperData.error) {
+        throw new Error(whisperData.error.message || "Whisper transcription error");
+      }
+
+      userText = whisperData.text;
+      
+      // ተጠቃሚው ምን እንደተናገረ እንዲያውቅ በጽሁፍ እናሳየዋለን
+      await fetch(https://api.telegram.org/bot${botToken}/sendMessage, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: 🎤 የሰማሁት: "${userText}" })
+      });
+    }
+
+    if (!userText) {
+      return res.status(200).send("OK");
+    }
+
+    // 3. ጽሁፉን ለ Llama 3.3 AI በመስጠት መልስ እናስወጣለን
     const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + groqApiKey,
+        "Authorization": Bearer ${groqApiKey},
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -36,7 +90,7 @@ export default async function handler(req, res) {
         messages: [
           { 
             role: "system", 
-            content: "You are a native Amharic speaker and an expert AI assistant. Always reply in the exact language the user uses. When answering in Amharic: 1) Speak naturally and fluidly like a real Ethiopian person, NOT like a literal machine translation. 2) Use warm, friendly, and culturally idiomatic Amharic. 3) Avoid awkward phrase structures and word-for-word translation from English." 
+            content: "You are a helpful AI assistant. Always match the user's language (English or Amharic). Provide clear, accurate, and concise answers." 
           },
           { role: "user", content: userText }
         ]
@@ -44,14 +98,14 @@ export default async function handler(req, res) {
     });
 
     const groqData = await groqResponse.json();
-
     if (groqData.error) {
       throw new Error(groqData.error.message || "Groq API error");
     }
 
     const aiReply = groqData.choices?.[0]?.message?.content || "መልስ ማግኘት አልተቻለም።";
 
-    await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
+    // 4. የ AI መልስ ለተጠቃሚው በቴሌግራም እንልካለን
+    await fetch(https://api.telegram.org/bot${botToken}/sendMessage, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -61,7 +115,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    await fetch("https://api.telegram.org/bot" + botToken + "/sendMessage", {
+    await fetch(https://api.telegram.org/bot${botToken}/sendMessage, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
